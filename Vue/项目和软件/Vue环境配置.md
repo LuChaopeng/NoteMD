@@ -1,4 +1,6 @@
-## Vue环境配置
+## Node和Vue环境配置
+
+### Node
 
 1. 安装NVM（Node版本管理器）
 
@@ -21,3 +23,7 @@
 4. 使用cnpm代替npm命令
 
    npm install -g cnpm --registry=https://registry.npm.taobao.org
+
+### Vue.js
+
+1. 安装vue和vue-cli　`cnpm install vue vue-cli -g`
