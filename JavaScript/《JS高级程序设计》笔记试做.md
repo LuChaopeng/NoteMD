@@ -1,19 +1,3 @@
-### 必知必会
-
-#### 1、词汇
-
-async（asynchronous） 异步
-
-defer 延缓
-
-binary  二进制
-
-octal  八进制
-
-hexadecimal  十六进制
-
-
-
 ## 第2章 HTML中的JavaScript
 
 #### 2.1 `<script>`元素
@@ -74,7 +58,7 @@ hexadecimal  十六进制
 
    要对整个脚本启用严格模式，在脚本开头加上这一行：
 
-   ** `"use strict";` **
+   **`"use strict";` **
 
    也可在函数体开头单独指定一个函数严格模式。
 
