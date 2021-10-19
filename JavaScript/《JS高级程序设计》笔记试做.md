@@ -383,12 +383,58 @@
 
 #### 8.1 理解对象
 
+1. 对象的属性分为两种：
 
+   **数据属性**和**访问器属性**
 
-#### 6.1 Object
+2. 内部特性用来描述属性的特征，用中括号括起来，如[[Enummerable]]
 
-1. 显式地创建对象：
-   - new Object()
+3. **数据属性**
+
+   4个特性
+
+   `[[Configurable]]` `[[Enumerable]]` `[[Writable]]` `[[Value]]` 
+
+   - `[[Configurable]]`：是否可以delete删除；是否可以修改特性；是否可以转为访问器属性/数据属性；（直接定义在对象上的属性默认为`true`）
+
+   - `[[Enumerable]]`：是否可以`for-in`遍历；（直接定义在对象上的属性默认为`true`）
+   - `[[Writable]]`：属性值是否可以被修改；（直接定义在对象上的属性默认为`true`）
+   - `[[Value]]`：属性值（默认为undefined  **惊现undefined的由来*）
+
+   *** 注意**：如果调用了`Object.defineProperty()`了但不指定特性，默认都为`false` (对于访问器属性来说也是如此）
+
+4. **访问器属性**
+
+   4个特性
+
+   `[[Configurable]]` `[[Enumerable]]` `[[Get]]` `[[Set]]` 
+
+   - `[[Configurable]]`：同上
+
+   - `[[Enumerable]]`：同上
+   - `[[Get]]`：获取函数 (默认为undefined)
+   - `[[Set]]`：设置函数（默认为undefined）
+
+   访问器属性不能直接定义，只能通过`Object.defineProperty()`定义。
+
+5. 示例
+
+   ```js
+   let book = {
+       year_:2017,		//伪私有成员
+       edition:1		//公共成员
+   }
+   Object.defineProperty(book,'year',{	//访问器属性year
+       get(){
+           return this.year_
+       },
+       set(newValue){
+           this.year_ = newValue
+       }
+   })
+   ```
+
+   
 
 ## 第10章 函数
 
