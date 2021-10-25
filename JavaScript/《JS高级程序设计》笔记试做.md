@@ -434,7 +434,429 @@
    })
    ```
 
+6. 定义多个属性
+
+   ```js
+   let book = {}
+   Object.defineProperties(book,{
+       year_: {
+           value: 2021
+       },
+       year:{
+           get(){
+               return this.year_
+           },
+           set(v) {
+               this.year_ = v
+           }
+       }
+   })
+   ```
+
+   其实跟`defineProperty`一样，不设置特性默认全为false，也可以手动在每个属性后面的描述对象里设置。
+
+7. 获取属性的特性
+
+   `Object.getOwnPropertyDescriptor(book,'year_')`获取book对象的year_属性的特性
+
+   `Object.getOwnPropertyDescriptors(book)`获取book对象所有属性的特性
+
+8. 合并对象
+
+   ```js
+   Object Object.assign(target,src,src1,src2)
+   ```
+
+   将源对象src, src1, src2 合并到目标对象 target 上，同时返回目标对象
+
+   - 复制的是**可枚举属性**和**自有属性**；<span style="color:green">这里需要后续理解</span>
+   - 执行浅复制，多个源对象有相同属性，使用最后一个值；
+   - 访问器属性的值会作为静态值给目标对象； 即无法转移get()和set()；
+   - 复制时出错，会直接中止而无法回滚
    
+9. 相等判定
+
+   与 `===` 相比，考虑了一些边界情况，如正确的NaN相等判定。
+
+   `Object.is(NaN,NaN)` -> `true`
+
+10. 增强的对象语法【**请默认使用**】
+
+    - 属性值简写
+
+      ```js
+      let name = 'Matt'
+      let person = {	//原来的写法
+      	name:name
+      }
+      let person = {	//简写得到一样的结果
+      	name
+      }
+      ```
+
+    - 可计算属性
+
+      使用可计算属性在对象字面量中直接动态命名属性，用中括号包围的对象属性键将在运行时作为JavaScript表达式求值
+
+      ```js
+      const nameKey = 'name'
+      let person = {
+      	[nameKey]:'Matt'
+      }
+      console.log(person) //{name:'Matt'}
+      ```
+
+    - 简写方法名
+
+      ```js
+      //旧方式：方法名、冒号、匿名函数表达式
+      let person = {
+      	sayName: function(name){
+      		console.log(`My name is ${name}`)
+      	}
+      }
+      //新方式
+      let person = {
+      	sayName(){
+      		console.log(`My name is ${name}`)
+      	}
+      }
+      //同样适用于获取函数和设置函数
+      let person = {
+      	name_:'',
+      	get name(){
+      		return name_
+      	},
+      	set name(name){
+      		this.name_ = name
+      	}
+      }
+      //可兼容可计算属性键
+      const methodKey = 'sayName'
+      let person = {
+      	[methodKey](name){
+      		console.log(name)
+      	}
+      }
+      ```
+
+11. 对象解构
+
+    ```js
+    let person = {
+        name:'Matt',
+        age:27
+    }
+    let {name:personName, age:personAge} = person
+    console.log(personName,personAge) //Matt 27
+    //若名称一样，可以使用简写
+    let {name,age} = person
+    //若引用的属性可能不存在，可以使用默认值
+    let {name,job='Engineer'} = person
+    
+    //如果要给事先声明好的变量赋值，表达式必须包含在一对括号中
+    let personName, personAge
+    let person = {
+        name:'Matt',
+        age:27
+    }
+    ({name: personName, age: personAge} = person)
+    ```
+
+12. 对象解构拓展
+
+    - 嵌套解构
+    - 部分解构
+    - 参数上下文匹配
+
+#### 8.2 创建对象
+
+​	创建对象的方式：1. new Object()； 2. 对象字面量；缺点是创建具有同样接口的多个对象需要重复编写很多代码
+
+1. 概述
+
+   ES5.1构造函数加原型继承；ES6支持了类和继承，是封装了之前规范的语法糖。
+
+2. **工厂模式**
+
+   可以创建多个类似对象，但没解决对象标识问题（新创建的对象是什么类型）
+   
+3. **构造函数模式**
+
+   1. 可以创建**特定类型**的对象，通过构造函数创建对象：
+
+   ```js
+   function Person(name, age, job){
+       this.name = name
+       this.age = age
+       this.job = job
+       this.sayName = function (){
+           console.log(this.name)
+       }
+   }
+   let person = new Person('Matt',27,'Doctor')
+   ```
+
+   2. 使用`new`操作符时会进行：
+      1. 在内存中创建一个新对象
+      2. 对象内部的`[[Prototype]]`特性被赋值为构造函数的`prototype`属性
+      3. 构造函数内部的`this`被赋值为这个新对象
+      4. 执行函数内部的代码（给新对象添加属性）
+      5. 返回创建的对象
+
+   3. 按照惯例，构造函数名**首字母大写**，其他函数首字母小写
+
+   4. 自定义构造函数可以确保实例被标识成特定类型（使用 `instanceof` 操作符确定对象类型）
+   5. 若不想传参，构造函数后面的括号可加可不加
+
+4. 构造函数也是函数
+
+   与普通函数的唯一区别是调用方式不同，**任何函数只要用`new`操作符调用就是构造函数，不使用`new`操作符就是普通函数。
+
+   调用一个函数而未明确设置this的情况下，this始终指向Global对象
+
+5. 构造函数存在的问题
+
+   构造函数定义的方法会在每个实例上都创建一遍，通过原型模式解决
+
+6. **原型模式**
+
+   每个函数都会创建一个`prototype`属性（不是[[prototype]]特性），这个属性是一个对象，就是通过调用构造函数创建的对象的原型。
+
+   将属性和方法直接添加到函数的 `prototype`属性（`Person.prototype`）上，就将由所有实例共享。
+
+7. **原型**
+
+   先上两个原型关系图
+
+   ![原型关系图](src\原型关系图.jpg)
+
+   ![](src\构造函数_原型对象_实例关系图.png)
+
+   1. 只要创建一个函数，就会有一个 `prototype`属性（指向原型对象），这个原型对象默认获得一个 `constructor`的属性，指回与之关联的构造函数。Person.prototype.constructor指向Person。
+   
+   2. 每次调用构造函数创建一个新实例，这个实例内部的 `[[prototype]]`指针就会被赋值为构造函数的原型对象。可以通过浏览器暴露的`__proto__`属性访问对象的原型。
+   
+   3. isPrototypeOf()会在传入参数的 `[[prototype]]`指向调用它的对象时返回true
+   
+   4. Object类有一个**`Object.getPrototypeOf()`**的方法，返回函数内部特性`[[prototype]]`的值。是ES5中得到对象的原型对象的**标准方法**，具有同样作用的**`__proto__`**属性只是浏览器实现的**非标准方法**
+   
+   5. 使用Object.setPrototypeOf()往实例的私有特性`[[prototype]]`里写入新值，可以重写一个对象的原型继承关系
+   
+      ```js
+      //重写对象person的原型为biped，这个操作的影响极为深远：首先，不管属性有什么差别，都是直接替换掉的；更重要的是，所有继承此原型的都会被最后一次重写影响，因此也严重影响性能
+      Object.setPrototypeOf(person,biped) 
+      ```
+   
+      为避免性能影响，应使用`Object.create()`来创建一个**新**对象，同时为其指定原型（即这个方法的第一个参数）。
+   
+8. 原型层级
+
+   1. 属性搜索
+
+      通过对象访问属性时，会按照属性名称开始搜索。开始于对象实例本身，若没有则沿着原型对象往上找。
+
+   2. 可以通过实例读取原型对象上的值但不能通过实例重写这些值，如果在对象创建与原型上同名的属性，就会**遮蔽**原型上对应的属性，把对象上的这个属性值设为**null**也不能恢复联系，除非使用`delete`操作符删除实例属性。
+
+   3. **hasOwnProperty()**方法用于确定某个属性在**实例上**还是**原型对象**上。
+
+      在属性存在于调用它的对象实例上时返回`true`
+
+      ```js
+      person.hasOwnProperty('name')//若name在person实例上，返回true，若只在原型上，返回false
+      ```
+
+   4. `in`操作符
+
+      会在通过对象访问指定属性时返回true，无论是在实例上还是原型上。
+
+      那么问题来了，如何确定某个属性是否存在于原型上？
+
+      同时使用 `hasOwnProperty()`和`in`：
+
+      ```js
+      function hasPrototypeProperty(object, name){
+      	return !object.hasOwnProperty('name') && (name in object)
+      }	//不在实例上又能通过in访问到
+      ```
+
+   5. for-in循环
+
+      可以通过对象访问并可以被枚举的属性都会返回(不管是在实例还是原型链上【也受到屏蔽的限制】)
+
+   6. `Array[String] Object.keys(obj)`
+
+      接收一个对象作为参数，返回所有可枚举属性名称的字符串数组（不走原型链）
+
+   7. `Array[String] Object.getOwnPropertyNames(obj)`
+
+      与6区别是能列出不可枚举的属性。
+
+      6、7在适当的时候可以替代for-in，比如不需要管原型的时候。
+
+   8. 属性枚举的顺序
+
+      for-in 和 Object.keys()的枚举顺序是不确定的，取决于JavaScript引擎
+
+      `Object.getOwnPropertyNames()、Object.getOwnPropertySymbols()、Object.assign()`的顺序是确定性的，顺序：
+
+      1. [升序]枚举数值键
+      2. [插入顺序]枚举字符串和符号键（在对象字面量中定义的键以逗号分隔的顺序为准）
+
+9. 对象迭代
+
+   略过
+
+10. 其他原型语法
+
+    ```js
+    //定义原型属性和方法的封装方式，不必每次Person.prototype了，也存在问题（先不深究这里）
+    function Person(){}
+    Person.prototype = {
+    	name:'Nicho',
+    	age:29,
+    	sayName(){}
+    }
+    ```
+
+11. 原型的动态性
+
+    从原型上搜索值是动态的，任何时候对原型所做的修改都会在实例上反映出来（即使实例在修改原型前已经存在）前面8.2-7-5也涉及到了。
+
+    **原因**：
+
+    实例和原型之间就是简单的指针，而不是保存的副本；
+
+    如果重写原型切断和构造函数的联系，也不会改变**已创建**实例与**最初**的原型之间的联系，引用的仍然是最初的原型。
+
+    **实例只有指向原型的指针，没有指向构造函数的指针**
+
+12. 原生对象原型
+
+    原生引用类型的构造函数（Object、Array、String）也在原型上定义了实例方法，而且也可以修改这些方法，但不推荐修改原生对象原型，推荐创建自定义的类继承原生类型。
+
+13. 原型的问题
+
+    所有属性在实例间共享：
+
+    函数，很合适，就是要共享的；
+
+    属性，不合适，原始值属性尚且可以用遮蔽解决问题，引用值不行。
+
+#### 8.3 继承（理解为主，面试时再去抠细节记忆）
+
+1. 继承的方式：接口继承、实现继承。ECMAScript函数没有签名，无法实现接口继承，主要通过原型链实现**实现继承**。
+
+2. 原型链继承
+
+   另一个类型的实例作为原型
+
+   ```js
+   SubType.prototype = new SuperType()
+   ```
+
+   问题：
+
+   - 原型中包含引用值的时候；
+
+   - 子类型实例化时不能给父类构造函数传参；
+
+3. 盗用构造函数继承
+
+   在子类构造函数中调用父类构造函数
+
+   ```js
+   function SubType(){
+   	SuperType.call(this)
+   }
+   ```
+
+   优点：
+
+   - 可以在子类构造函数中向父类构造函数传参
+
+   问题：
+
+   - 必须在构造函数中定义方法
+   - 子类也不能访问父类原型上定义的方法
+
+4. 组合继承（使用最多的继承模式）
+
+   综合原型链和盗用构造函数，使用原型链继承原型上的属性和方法，通过盗用构造函数继承实例属性。
+
+   ```js
+   function Parent (name) {
+       this.name = name;
+       this.colors = ['red', 'blue', 'green'];
+   }
+   Parent.prototype.getName = function () {
+       console.log(this.name)
+   }
+   function Child (name, age) {
+       Parent.call(this, name);
+       this.age = age;
+   }
+   Child.prototype = new Parent();
+   Child.prototype.constructor = Child;
+   var child1 = new Child('kevin', '18');
+   child1.colors.push('black');
+   console.log(child1.name); // kevin
+   console.log(child1.age); // 18
+   console.log(child1.colors); // ["red", "blue", "green", "black"]
+   var child2 = new Child('daisy', '20');
+   console.log(child2.name); // daisy
+   console.log(child2.age); // 20
+   console.log(child2.colors); // ["red", "blue", "green"]
+   
+   ```
+
+5. 原型式继承、寄生式继承、寄生式组合继承
+
+#### 8.4 类
+
+1. 类定义
+
+   ```js
+   类声明和类表达式
+   class Person{}
+   const Animal = class{}
+   ```
+
+   与函数表达式（回顾：函数声明可以被提升，表达式不可以，所以叫声明提升）类似，类表达式在被求值前也不能引用；
+
+   但与函数表达式不同的是，函数声明可以提升，类定义（类声明）不可以；
+
+2. 作用域
+
+   函数受函数作用域限制，类受**块作用域**限制；
+
+3. 类的构成
+
+   可以包含函数构造方法、实例方法、获取函数、设置函数、静态类方法，但都不是必需的，空的类定义也有效。
+
+   与构造函数一样，类首字母名称大写。
+
+   类表达式名称可选，但不能在表达式作用域外访问。`let Person = class PersonName{}`
+
+4. 类构造函数
+
+   `constructor`在类定义块内部创建类的构造函数，告诉解释器使用new创建实例时，应调用这个函数。不定义将为空函数。
+
+   1. 使用`new`操作符实例化Person的操作等于使用`new`调用其构造函数，只不过`new`和类用在一起时，JavaScript解释器知道应该用`constructor`函数进行实例化，`new`调用类的构造函数：
+
+      - 在内存中创建一个新对象
+      - 在这个新对象内部的`[[Prototype]]`指针被赋值为构造函数的 `prototype`属性；
+      - 构造函数内部的`this`被赋值为这个新对象（this指向新对象）
+      - 执行构造函数内的代码（给新对象添加属性）
+      - 如果构造函数返回非空对象，则返回该对象，否则返回刚创建的对象。
+
+      参见 #8.2-3-2
+
+   2. 类实例化时传入的参数会用做构造函数的参数。若不需要参数，类名后的括号可选。
+
+      参见 #8.2-3-5
+
+   3. 
 
 ## 第10章 函数
 
