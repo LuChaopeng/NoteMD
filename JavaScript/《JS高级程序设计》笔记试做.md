@@ -856,7 +856,211 @@
 
       参见 #8.2-3-5
 
-   3. 
+   3. 类构造函数与构造函数的主要区别：
+
+      调用类构造函数必须使用new操作符，而普通构造函数如果不使用new调用，就会以全局的this（Global，通常是window）作为内部对象
+
+      类构造函数没有什么特殊之处，实例化之后会成为普通的实例方法，可以在实例上引用它（但由于是类构造函数，还是要使用new调用）
+
+   4. ECMAScript类就是一种特殊函数
+
+      在类的上下文中，类本身在使用new调用时就被当成构造函数，而此时类中定义的constructor不会被当成构造函数。
+
+      ```js
+      class Person {}
+      let p1 = new Person()
+      console.log(p1.constructor === Person)//true
+      console.log(p1 instanceof Person)//true
+      console.log(p1 instanceof Person.constructor)//false
+      let p2 = new Person.constructor()
+      console.log(p2.constructor === Person)//false
+      console.log(p2 instanceof Person)//false
+      console.log(p2 instanceof Person.constructor)//true
+      ```
+
+      类可以像其他对象或函数引用一样在任何地方定义（比如在数组中），也可以把类作为参数传递；
+
+   5. 立即实例化类
+
+      ```js
+      let p = new Class Foo{	//表达式定义，所以类名Foo可选。p就是这个实例
+      	constructor(x){
+      		console.log(x)
+      	}
+      }('bar')	//立即实例化，会执行构造函数，打印出参数'bar'
+      ```
+
+   6. 类上的实例成员、原型成员、类成员
+
+      1. 实例成员
+
+         来源：new调用类标识符时执行类构造函数`constructor`，为实例（this）添加“自有”属性，不在原型上共享。
+
+         ```js
+         class Person {
+             constructor() {
+                 this.name = 'jack'
+                 this.sayName = ()=>{
+                     console.log(this.name)
+                 }
+             }
+         }
+         ```
+
+      2. 原型方法和访问器
+
+         来源：在类块中定义的方法作为原型方法
+
+         constructor的this指向实例；
+
+         类块中的this指向原型（如这里的set访问器，this.name_是定义在原型上的，不过name属性在实例上）；
+
+         静态方法的this指向类自身；
+
+         ```js
+         class Person {
+             constructor(){} //会存在于不同的实例上
+             //类块定义的会定义在类的原型上
+             sayHello(){
+                 console.log('Hello')
+             }
+             //等同于对象属性，可以用字符串、符号、或计算值作为键
+             [symbolKey](){
+                 console.log('invoked symbolKey')
+             }
+             ['computed'+'Key'](){
+                 console.log('invoked computedKey')
+             }
+             //支持获取和设置访问器，跟普通对象一样
+             set name(newName) {
+                 this.name_ = newName
+             }
+             get name(){
+                 return this.name_
+             }
+             //不能在类块中给原型添加原始值或对象
+             //name:'Jake'   Uncaught SyntaxError:Unexpected token
+         }
+         ```
+
+      3. 静态类方法
+
+         静态成员使用`static`作为前缀，`this`引用自身，每个类只能被创建一次。
+
+         静态类方法非常适合用作实例工厂，如下例。
+
+         ```js
+         class Person {
+             constructor(age){
+                 this.age = age
+             } //会存在于不同的实例上
+             static locate(){
+                 console.log('class',this)
+                 return new Person(13)
+             }
+         }
+         let p = Person.locate() //class,class Person{}
+         console.log(p.age) //13
+         ```
+
+      4. 非函数原型和类成员
+
+         类定义并不显式地支持在原型或类上添加数据成员（但自己实践可以给类添加静态数据成员，不过说这是反模式，不应当使用），但在类定义外部，可以手动添加。
+
+         ```js
+         class Person{
+             sayName(){
+                 console.log(`${Person.greeting}${this.name}`)}}
+         Person.greeting = 'My name is '
+         Person.prototype.name = 'jake'
+         let p = new Person()
+         p.sayName() //My name is Jake
+         ```
+
+      5. 迭代器和生成器方法
+
+         **\*【暂时略过】\***
+
+   7. 继承
+
+      1. `extends`单继承
+
+         使用`extends`关键字，可以继承任何拥有[[construct]]和原型的对象，意味着可以继承类或者普通的构造函数
+
+         ```js
+         class Vehicle {}
+         class Bus extends  Vehicle{}
+         let b = new Bus()
+         console.log(b instanceof Bus) //true
+         console.log(b instanceof Vehicle) //true
+         
+         function Person(){}
+         class Engineer extends Person{}
+         let e = new Engineer()
+         console.log(e instanceof Engineer) //true
+         console.log(e instanceof Person) //true
+         ```
+
+      2. `super()`
+
+         派生类通过 `super`关键字引用它们的原型，仅限于在类构造函数、实例方法、静态方法内部使用。
+
+         - 在类构造函数中使用`super`可以调用父类构造函数；
+
+           ```js
+           class Bus extends Vehicle {
+           	constructor(){
+           		super() //相当于super.constructor
+           	}
+           }
+           ```
+
+         - 在静态方法中使用`super`调用继承的类上定义的静态方法
+
+           ```js
+           class Bus extends Vehicle {
+           	static identify(){
+           		spuer.identify()
+           	}
+           }
+           ```
+
+      3. `[[HomeObject]]`
+
+         类构造函数和静态方法有特性`[[HomeObject]]`，指向定义该方法的对象，`super`定义为`[[HomeObject]]`的原型
+
+      4. 使用`super`注意
+
+         - 只能在派生类构造函数、实例方法、静态方法中使用
+         - 不能单独使用`super`，要么调构造函数，要么静态方法
+         - 调用`super()`会调用父类构造函数，并将返回的实例赋值给`this`
+         - `super()`如同调用构造函数，可以给父类构造函数传参，`super(param)`
+         - 如果没有定义类构造函数，会在实例化派生类时调用`super()`并传入所有参数
+         - 在类构造函数中，不能在`super()`之前调用this
+         - 如果派生类中显示定义了构造函数，则必须在其中调用`super()`，要么返回一个对象
+
+      5. 抽象基类
+
+         `new.target`保存通过`new`调用的类或函数，通过`new.target`检测以阻止实例化抽象基类，实现抽象类。
+
+         也可以通过检查指定派生类必须定义的方法。（尽管跟java比起来相当奇怪，但也算实现了）
+
+         ```js
+         class Vehicle {
+             constructor() {
+                 if(new.target === Vehicle){
+                     throw new Error('Vehicle cannot be directly instantiated')
+                 }
+                 if(!this.foo){
+                     throw new Error('Inheriting class must define foo()')
+                 }
+             }
+         }
+         ```
+
+      6. 类混入
+
+         模拟多继承（略）
 
 ## 第10章 函数
 
