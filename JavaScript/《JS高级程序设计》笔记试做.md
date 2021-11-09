@@ -333,7 +333,7 @@
 
 5. 函数参数被认为是当前上下文中的变量
 
-6. 执行到`try/catch`语句中的`catch`块，会在作用域链前端添加一个变量对象。创建一个新的变量对象，这个变量对象会包含要抛出的错误对象的声明。
+6. 执行到`try/catch`语句中的`catch`块，会在作用域链 前端添加一个变量对象。创建一个新的变量对象，这个变量对象会包含要抛出的错误对象的声明。
 
 7.  ** `const`**声明的变量不能再被赋其他引用值，但对象键值不受影响。如果想整个对象不能被修改，使用`Object.freeze()`，再赋值会静默失败。
 
@@ -913,7 +913,7 @@
 
          constructor的this指向实例；
 
-         类块中的this指向原型（如这里的set访问器，this.name_是定义在原型上的，不过name属性在实例上）；
+         类块中的this指向原型（其实是永远指向调用方法的对象，如果实例调用，那就是指向实例）（如这里的set访问器，this.name_是定义在原型上的，不过name属性在实例上）；
 
          静态方法的this指向类自身；
 
@@ -947,7 +947,7 @@
 
          静态成员使用`static`作为前缀，`this`引用自身，每个类只能被创建一次。
 
-         静态类方法非常适合用作实例工厂，如下例。
+         静态类方法非常适合用作实例工厂，如下例。通常用于为一个应用程序创建工具函数。
 
          ```js
          class Person {
@@ -965,7 +965,7 @@
 
       4. 非函数原型和类成员
 
-         类定义并不显式地支持在原型或类上添加数据成员（但自己实践可以给类添加静态数据成员，不过说这是反模式，不应当使用），但在类定义外部，可以手动添加。
+         类定义并不显式地支持在原型或类上添加数据成员（但自己实践可以给类添加静态数据成员【之后在MDN上也看到这样的例子，不过后面也说“静态的或原型的数据属性必须定义在类定义的外面”】，不过说这是反模式，不应当使用），但在类定义外部，可以手动添加。
 
          ```js
          class Person{
@@ -1093,8 +1093,16 @@ let sum = new Function("num1","num2","return num1+num2"); //Function构造函数
 #### 10.1 箭头函数
 
 1. 可以使用函数表达式的地方都可以使用箭头函数；
+
 2. 只有一个参数的时候，不需要括号；
+
 3. 箭头函数不能使用`arguments` `super` `new.target`，不能用作构造函数，也没有`prototype`属性；
+
+4. 函数体部分有省略大括号的情况，但注意：
+
+   - 只能有一条语句；
+
+   - 隐式返回这条语句的值；（相当于写了个return）
 
 #### 10.2 函数名
 
@@ -1233,7 +1241,592 @@ let makeKing = (name = 'Henry') => `King ${name}`;
 
 3. *模块模式
 
+## 第11章 期约与异步函数
 
+#### 11.1  异步编程
+
+1. 异步操作是为了优化因计算量大而时间长的操作，但只要不想为了等待某个异步操作而阻塞线程执行，就可以使用异步操作。
+
+2. 异步操作经常是必要的，强制进程等待一个长时间的操作通常是不可行的。
+
+   eg：
+
+   *代码要访问一些高延迟的资源，比如等待远程服务器的响应；*
+
+   *监听事件，事件发生时触发执行某一函数；*
+
+   *延迟一定的时间后执行某一函数；*
+
+3. 异步代码不容易推断，异步操作由系统生成一个入队的中断，但入队的时机对JavaScript运行时是一个黑盒，无法预知（尽管可以保证发生在当前线程同步代码之后）。以往有这样几个模式来实现异步编程：
+
+   - 定义回调函数来表明异步操作完成
+
+     1. 异步返回值
+
+        把`setTimeout()`的返回值传到需要的地方：
+
+        ```js
+        function double(value,callback){
+            setTimeout(()=>{callback(value*2)},1000)
+        }
+        double(2,x=>{console.log(x)})
+        ```
+
+     2. 失败处理
+
+        成功回调和失败回调
+
+        ```js
+        function double(value,success,failture){
+        	XXXX
+        }
+        ```
+
+     3. 嵌套异步回调
+
+        如果异步返回值又依赖于另一个异步返回值，就要用嵌套回调，随着代码复杂，回调策略不具有可拓展性。
+
+#### 11.2 期约
+
+1. 期约是对尚不存在结果的一个替身。ES6新增引用类型`Promise`，通过`new`实例化，创建期约时需要传入执行器函数作为参数。
+
+2. 期约状态机
+
+   期约是一个有状态的对象，可能处于以下三种状态之一：
+
+   - 待定（pending）
+   - 兑现（fulfilled）
+   - 拒绝（rejected）
+
+   待定是一个期约最初的状态，可以落定（settled）为fulfilled或者rejected，落定后期约的状态就不再改变。
+
+   期约**将异步行为封装起来，隔离外部的同步代码**，它的状态是私有的，不能直接通过JavaScript检测到。
+
+3. 期约的作用
+
+   - 提供期约的完成状态；
+   - 提供期约改变时异步操作生成的值；
+
+   期约改变时，若为兑现，有一个value，若为拒绝，有一个reason，都是可选的不可修改的引用，默认undefined
+
+4. 通过执行器控制期约状态
+
+   期约的状态是私有的，通过执行器函数控制期约状态，执行器的两项职责：
+
+   - 初始化期约的异步行为；
+   - 控制状态的最终转换；（通过 `resolve()`和`reject()`实现）
+
+5. Promise静态方法：`Promise.resolve()`
+
+   调用`Promise.resolve()`方法，可以实例化一个解决的期约，它的值（`value`）为传入的第一个参数。
+
+   `console.log(Promise.resolve(0))`的打印出0，如果传入的参数本身是一个期约，它就相当于一个空包装，可以认为是一个幂等方法，利用这个幂等性可以保留传入期约的状态。
+
+6. Promise静态方法：`Promise.reject()`
+
+   实例化一个拒绝的期约并抛出一个异步错误（只能通过拒绝处理程序捕获），它的理由（`reason`）就是传入的第一个参数。
+
+   不是幂等的，如果传入一个期约，这个期约将成为它的拒绝理由（`reason`）。
+
+7. Promise静态方法：`Promise.all()`
+
+   组合期约
+
+   接收一个可迭代对象，返回一个新期约，这个期约会在包含的每个期约全部解决之后再解决，如果有一个拒绝，则合成的期约也会拒绝并将第一个拒绝的`reason`作为拒绝理由（不过并不影响包含的其他期约的正常拒绝操作）。
+
+   ```js
+   Promise.all([
+       Promise.resolve(1),
+       Promise.resolve(),
+       Promise.resolve('val')
+   ])
+   .then((values)=>{
+       console.log(values)
+   })
+   // 删除[ 1, undefined, 'val' ]
+   ```
+
+8. Promise静态方法：`Promise.race()`
+
+   接收一个可迭代对象，返回一个新期约，这个期约是包含期约中最先落定的期约的镜像。
+
+9. Promise**实例**方法：`Promise.prototype.then()`
+
+   为期约添加处理程序，最多接收两个参数（处理函数onResolved函数和onRejected函数，会忽略非函数参数），分别在进入“兑现”和“拒绝”状态时执行，返回一个新的期约实例（无论`fulfilled`还是`rejected`均用`Promise.resolve()`包装），这个期约实例的`value`来自处理函数的返回值，默认为`undefined`，如果在处理程序中抛出了异常，返回值就是一个拒绝的期约（大概像这个样子`Promise.resolve(Promise.rejected())`）。
+
+   **`then()`返回期约指的是把`then()`的处理函数返回的值包装成一个期约**
+
+   ```js
+   let p = new Promise(((resolve, reject) =>{
+       console.log('first')
+       resolve()
+   }))
+   let p2 = p.then(()=>{
+       console.log('second')})
+   //这个例子里，p.then()返回一个用Promise.resolve()包装的期约，但then()的处理函数并未返回任何值，所以p2为 Promise {undefined}，若
+   let p3 = p.then(()=>{
+       return 'p3'})
+   //则p3为 Promise {'p3'}
+   ```
+
+   **所以如果要处理连续的Promise链，`then()`的处理函数应主动返回一个Promise给`then()`进行包装和返回，就应该是像下面p1.then()里写的那样：**
+
+   ```js
+   let p1 =new Promise(((resolve, reject) => {
+       console.log('p1')
+       setTimeout(resolve,1000)
+   }))
+       p1.then(()=>{
+        //return Promise给p.then()
+        return new Promise((resolve, reject) => {
+           console.log('p2')
+           setTimeout(resolve,1000)
+       })
+   }).then(()=>{
+           console.log('p3')
+       })
+   ```
+
+   **还有很多这样的写法，让我一度很迷惑：**
+
+   ```js
+   /*可以注意到没有return关键字，这是箭头函数的原因:
+   箭头函数函数体部分有省略大括号的情况，但注意：
+   - 只能有一条语句；
+   - 隐式返回这条语句的值；（相当于写了个return）*/
+   p1.then(()=>
+        new Promise((resolve, reject) => {
+            console.log('p2')
+            setTimeout(resolve, 1000)
+        })
+   )
+   ```
+
+   
+
+10. Promise**实例**方法：`Promise.prototype.catch()`
+
+   相当于`Promise.prototype.then(null,onRejected)`
+
+11. Promise**实例**方法：`Promise.prototype.finally()`
+
+    [书里写的奇奇怪怪，不易理解，这里摘抄了MDNS上的描述]
+
+    **`finally()`**方法返回一个[`Promise`](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)。在promise结束时，无论结果是fulfilled或者是rejected，都会执行指定的回调函数。这为在`Promise`是否成功完成后都需要执行的代码提供了一种方式。
+
+    这避免了同样的语句需要在[`then()`](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/then)和[`catch()`](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch)中各写一次的情况。
+
+12. 非重入期约方法【写到这的时候，因为书中难以理解的描述，转而研究了一波相关内容写了后面两个文章，现在再回过头继续看书】
+
+    期约落定时，对应的处理程序（指then()、catch())仅仅会被排期（指扔进作业队列），即使添加处理程序在落定之前也是一样。
+
+    这是JavaScript的非重入特性 ，适用于then()、catch()、finally()的处理程序
+
+13. 传递解决值（resolve的value）和拒绝理由（reject的reason）
+
+    ```js
+    let p1 = Promise.resolve('foo')
+    p1.then(value => {console.log(value)}) //foo
+    let p2 = Promise.reject('bar')
+    p2.catch(reason => {console.log(reason)}) //bar
+    ```
+
+14. 拒绝期约与拒绝错误处理
+
+    期约可以以任何理由拒绝，但最好统一使用错误对象。
+
+    ```js
+    let p = new Promise (
+    	(resolve,reject)=>{reject(Error'foo')})
+    ```
+
+15. 将期约组合起来
+
+    期约连锁：期约一个接一个地拼接；
+
+    期约合成：多个期约组合为一个 期约；
+
+    1.每个期约实例的方法（`then()` `catch()` `finally()`）都会返回一个新的期约对象。
+
+    ```js
+    let p = new Promise(((resolve, reject) =>{
+        console.log('first')
+        resolve()
+    }))
+    p.then(()=>{
+        console.log('second')})
+    .then(()=>{
+        console.log('third')
+    })
+    .then(()=>{
+        console.log('fourth')
+    })
+    ```
+
+    但这里例子里面的任务都是同步的，直接执行同步任务也可以，真正的用处是执行一串异步任务时。
+
+    ```js
+    new Promise((resolve, reject) =>{
+        console.log('first')
+        setTimeout(resolve,1000)
+        })
+        .then(()=>{
+        return new Promise((resolve,reject)=>{
+            console.log('second')
+            setTimeout(resolve,1000)
+            })
+        })
+        .then(()=>{
+            return new Promise((resolve, reject) => {
+                console.log('third')
+                setTimeout(resolve,1000)
+            })
+        })
+        .then(()=>{
+            console.log('fourth')
+        })
+    ```
+
+16. 更多
+
+    串行期约合成
+
+    期约拓展：取消期约
+
+    期约拓展：期约进度通知
+
+#### 11.3 异步函数
+
+1. 使用Promise，在处理期约返回值时，必须把对应的代码写到then里的期约处理程序里去，非常不便。
+
+2. `async /æˈsɪŋk/`
+
+   `async`关键字用于声明异步函数，示例： 
+
+   ```js
+   async function foo(){}
+   let bar = async function(){}
+   let baz = async ()=>{}
+   class Qux{
+       async qux(){}
+   }
+   ```
+
+   异步函数默认的返回值为`undefined`，使用`return`显式返回值。返回值会被`Promise.resolve()`包装成一个期约对象。
+
+3. 在异步函数中抛出错误也是会返回拒绝的期约。
+
+4. `await`的执行顺序为从右到左，不阻塞`await`表达式，但阻塞后面的代码
+
+   await之后如果不是promise，await会阻塞后面的代码，会先执行async外面的同步代码，等外面的同步代码执行完成在执行async中的代码。
+
+   如果它等到的是一个 promise 对象，await 也会暂停async后面的代码，先执行async外面的同步代码，等着 Promise 对象 fulfilled，然后把 resolve 的参数作为 await 表达式的运算结果。
+   ————————————————
+   版权声明：本文为CSDN博主「暖暖--」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+   原文链接：https://blog.csdn.net/qq_41681425/article/details/85775077
+
+5. `await`必须在异步函数中使用
+
+6. 实现sleep（）
+
+   ```js
+   async function sleep(delay){
+   	return new Promise((resolve)=>{setTimeout(resolve,delay)})
+   }
+   ```
+
+7. 平行执行（暂略）
+
+8. 串行执行期约（暂略）
+
+#### 尝试解释Promise的用处
+
+1. 非重入期约方法
+
+   奇奇怪怪的描述，看着烦。
+
+   联系事件循环机制直接总结一波【下面的内容翻来覆去改了好几次，我打算推倒重来，综合看到的资料，试图讲清楚】：
+
+   
+
+   （图例主要讲队列和执行上下文，未区分微宏任务）
+
+   ![JS运行时事件处理](src\JS运行时任务处理.svg)
+
+   
+
+   - 事件循环中，每一次事件循环从宏任务队列队首（FIFO）中取出一个任务执行，当这个任务执行完成后（任务退出，执行上下文为空），立即依次执行微任务队列中的微任务直至微任务队列为空（即使中途有微任务加入）；然后进入下一次事件循环。
+
+   - 显然，setTimeout()是同步的，它的回调函数是异步的，并且是宏任务；
+
+   - 异步会放到同步代码的后面执行；（其实都是放到任务队列依次取，关键是搞明白什么时候会放进任务队列，放进了哪个任务队列）
+
+   - Promise()是微任务；//之前的写法（不准确）：Promise()是同步的，并且是微任务；
+
+   - Promise()落定后的then()是微任务；//之前的写法:Promise()落定后的then()是异步的，但then()是微任务；
+
+     请听题：控制台输出啥？
+
+     ```js
+     console.log('开始')
+     setTimeout(() => {
+         console.log('定时器0秒后的回调')
+     }, 0)
+     Promise.resolve()
+         .then(() => {
+             console.log('期约回调1')
+         })
+         .then(() => {
+             console.log('期约回调2')
+         })
+     console.log('结束')
+     ```
+
+     答案非常清楚了叭
+
+     ```js
+     开始
+     结束
+     期约回调1
+     期约回调2
+     定时器0秒后的回调
+     ```
+
+     好的教育方式让人醍醐灌顶，辣鸡的书只会让人原地懵逼爆炸===
+
+   
+
+   重新讲：
+
+   先梳理下Promise到底干嘛用的
+
+   ```js
+   const p = new Promise(
+       (resolve,reject)=>{setTimeout(()=>{console.log(1);resolve();},1000)})
+   .then(()=>{console.log(2)})
+   ```
+
+   首先Promise解决的痛点是：我们不知道异步操作什么执行结束，而Promise可以通知我们。
+
+   从0开始理解：比如我们想要延迟一段时间执行一段代码，于是就把这段代码写到一个定时器里。
+
+   ```js
+   setTimeout(()=>{
+       console.log('我想在1秒后执行这行代码')
+   },1000)
+   ```
+
+   但我们还想要等这段代码执行完时执行别的代码，可我们不知道这段代码什么时候执行完，那怎么办？凭直觉讲，那就直接把别的代码写到那段代码后面就行了呗，像这样：
+
+   ```js
+   setTimeout(()=>{
+       console.log('我想在1秒后执行这行代码')
+       console.log('我想在前面的执行完之后执行')
+   },1000)
+   ```
+
+   看似轻松的解决了问题，但如果别的代码还是一个异步操作呢
+
+   ```js
+   setTimeout(()=>{
+       console.log('我想在1秒后执行这行代码')
+       setTimeout(()=>{
+           console.log('我想在前面的执行完后2秒执行')
+       },2000)
+   },1000)
+   ```
+
+   显而易见，会一层套一层，之前我写socket编程，就这样各种嵌套回调，代码变复杂，也更不好维护了。同时，每一个异步函数的执行上下文（作用域）就被限制在这个setTimout的回调里面了，多个回调之间就难以建立联系。
+
+   那Promise是怎么通知我们异步操作结束了的呢？来实践一下。
+
+   先把我们的异步操作放到Promise对象里面去：
+
+   ```js
+   let p = new Promise(
+       (resolve, reject)=>{
+           setTimeout(()=>{console.log('我想在1秒后执行这行代码')},1000)
+       }
+   )
+   ```
+
+   在new这个Promise时，构建器函数（就是`(resolve,reject)=>{}`）也会立即开始执行，我们的异步操作就在Promise中执行了。不过看起来好像和之前的方式没什么区别呀，就是放到了一个对象里面嘛，不着急，看构造器函数的参数：`resolve`和`reject`函数（由JavaScript引擎定义好的），这就是Promise的用处所在，这两个函数就是一个“通知”，我们在上述代码上做出修改：
+
+   ```js
+   let p = new Promise(
+       (resolve, reject)=>{
+           setTimeout(()=>{
+               console.log('我想在1秒后执行这行代码')
+               resolve()
+           },1000)
+       }
+   )
+   ```
+
+   这里在第5行增加了一个`resolve()`，一旦执行了`resolve()`，就相当于发出了一个通知说“这个异步操作完成啦”，这个通知写在哪里是由你来定的，不过当然是要在异步操作执行结束后进行通知啦（这里不展开讲`reject()`了，同理）。那么，虽然通知发出去了，别的代码（`console.log('我想在前面的执行完之后执行')`）怎么知道上一个异步操作执行结束了呢？这就需要接收到那个通知，`then()`就是负责接收通知的，一旦`resolve()`了，就会进入`then()`里面，把别的代码写到`then()`里面就可以啦！（关于`then`的参数以及与`catch`的异同不展开了）
+
+   ```js
+   let p = new Promise(
+       (resolve, reject)=>{
+           setTimeout(()=>{
+               console.log('我想在1秒后执行这行代码')
+               resolve()
+           },1000)
+       }
+   ).then(
+       ()=>{console.log('我想在前面的执行完之后执行')}
+   )
+   ```
+
+   而回调嵌套回调的代码也解开了嵌套，变成了：
+
+   ```js
+   let p = new Promise(
+       (resolve, reject)=>{
+           setTimeout(()=>{
+               console.log('我想在1秒后执行这行代码')
+               resolve()
+           },1000)
+       }
+   ).then(
+       ()=>{
+           setTimeout(()=>{
+               console.log('我想在前面的执行完后2秒执行')
+           },2000)
+       }
+   )
+   ```
+
+#### 尝试讲解JavaScript事件循环中的微任务和宏任务
+
+JavaScript在设计上是单线程非阻塞的，仅有的一个主线程通过事件循环机制（Event Loop）执行全部任务。需要留意以下的几点：
+
+- 任务分为宏任务（Macrotask）和微任务（Microtask），分别位于宏任务队列，或称**任务队列（Task Queue）**和微任务队列，或称**作业队列（Job Queue）**，遵循先进先出的原则（FIFO）；（为免混淆，本文不使用加粗部分的表述，但它其实是更准确的说法）
+- 执行上下文是一个栈，正在执行的任务位于执行栈（FILO）中；
+- 每一次事件循环率先取出宏任务队列队首的那个宏任务进入执行栈，执行完毕后执行全部微任务，一次事件循环结束；
+- 微任务的优先级更高，指的是执行完**一个宏任务**后执行**全部微任务（清空微任务队列）**，而非先做微任务再做宏任务；
+- 宏任务的例子有这些：script（整体的代码）、`setTimeout`、 `setInterval`、 `setImmediate`、 I/O 任务等等；
+- 微任务的例子有这些：`Promise.then()`、 `processes.nextTick` 等等，注意，Promise的执行器函数会在new Promise()时一起执行，执行器函数不是微任务，而是属于当前宏任务下的一个普通**同步函数**；
+
+
+
+接下来就是喜闻乐见的判断代码输出顺序环节，通过这个简单的例子彻底解惑，**放弃尝试的同学可以直接看控制台输出，毕竟不是为了 考倒自己，而是学到东西**
+
+```js
+console.log('宏任务0开始') 
+let p = new Promise((resolve, reject)=>{
+    console.log('Promise执行器，包含在宏任务0内')
+    setTimeout(()=>{
+        console.log('Promise执行器里的异步函数，宏任务1')
+        resolve()
+        },0)
+    })
+p.then(() => {
+       console.log('在p的resolve()后执行，微任务0')
+   })
+   .then(() => {
+       console.log('在p.then的resolve()后执行，微任务1')
+    })
+setTimeout(() => {
+    console.log('定时器0秒后的回调，宏任务2')
+}, 0)
+console.log('宏任务0结束')
+```
+
+ 是游刃有余还是一头雾水呢？如果你尝试直接复制代码输出结果（图中红线代表一次宏任务的执行，绿线代表清空微任务队列，即执行微任务队列中的全部微任务）：
+
+![](src\事件循环与任务优先级2.png)
+
+控制台上输出的顺序竟然如此规律
+
+1. 执行第一个宏任务
+2. 清空微任务队列（此时队列空）
+3. 执行第二个宏任务
+4. 清空微任务队列
+5. 执行第三个宏任务
+6. 清空微任务队列（此时队列空）
+
+看到这里，可能已经会豁然开朗了，我们结合这段代码，再把它的执行过程好好捋一捋（引用格式表示**当前任务队列**和**执行栈**状态）：
+
+> 宏任务：script（整体代码）；	微任务：空；	执行栈：空；
+
+1. 第一次事件循环开始，取宏任务队列队首的任务“script(整体代码)”，放入执行栈开始执行；
+
+   - 第1行：控制台输出：*“宏任务0开始”*
+
+   - 第2行：new Promise()时里面的执行器立即执行，①控制台输出：*“Promise执行器，包含在宏任务0内”*；②`setTimeout`开始计时器，其回调将在0秒后进入宏任务队列（注意**延迟结束后进入队列排队，不是立即执行，也不是进入队列再延迟**），由于这里的延迟是0秒，所以此时：
+
+     > 宏任务：setTimeout()； 	微任务：空；	执行栈：script->Promise执行器；
+
+2. 执行栈继续往后执行，`p.then()`是一个微任务，但它特殊在要等到`p`落定为`fulfilled`(这里是执行resolve()时)或`rejected`之后才会进入微任务队列。与`setTimeout()`的相同，都是异步的；与`setTimeout()`不同的是，`setTimeout()`等的是计时器，`then()`等的是Promise落定状态；以及`setTimeout()`进入宏任务队列，`then()`进入微任务队列。
+
+   所以两个`then()`之后，此时的任务队列并没有发生变化。
+
+3. 执行栈继续往后执行，遇到了第二个`setTimeout()`，同样，其回调将等待0秒后进入宏任务排队，由于是0秒，所以立即进入宏任务队列排队了。最后一行代码进入执行栈，控制台输出：*“宏任务0结束”*，此时：
+
+   > 宏任务：setTimeout() 宏任务1 | setTimeout()宏任务2；	微任务：空；	执行栈：script->console.log()
+
+4. 宏任务0执行结束了，去执行微任务队列中的全部微任务。诶，没有微任务呀，舒服了。至此，第一次事件循环结束。
+
+   > 宏任务：setTimeout() 宏任务1 | setTimeout()宏任务2；	微任务：空；	执行栈：空
+
+5. 第二次事件循环开始，取宏任务队列队首的任务“setTimeout() 宏任务1”，放入执行栈开始执行；控制台打印：*“Promise执行器里的异步函数，宏任务1”*，并执行`resolve()`。
+
+   > 宏任务：setTimeout()宏任务2；	微任务：空；	执行栈：setTimeout的回调：console.log();  resolve();
+
+6. `resolve()`时，Promise落定，在一边等待的`then()`终于可以入队了，所以`p.then()`进入微任务队列，注意这个时候，`p.then().then()`没有进入队列哦，还在等待`p.then()`的返回值。
+
+   > 宏任务：setTimeout()宏任务2；	微任务：p.then()；	执行栈：空；
+
+7. 宏任务1执行结束了，去执行微任务队列中的全部微任务。诶，这次有微任务了，将`p.then()`取出放入执行栈开始执行，控制台打印：*“在p的resolve()后执行，微任务0”*。
+
+   > 宏任务：setTimeout()宏任务2；	微任务：空；	执行栈：p.then()：console.log()；
+
+8. 最精彩的来了，我们知道，默认情况下，`p.then()`会返回一个value为`undefined`的已`resolve`的Promise给下一个`then()`，这就使得`p.then()`执行后，`p.then().then()`可以立即进入微任务队列。此时：
+
+   > 宏任务：setTimeout()宏任务2；	微任务：p.then().then()；	执行栈：空；
+
+   诶呦，这中途加进来的可怎么处理呀，记住：微任务的执行原则是：**依次执行微任务队列中的微任务直至微任务队列为空（即使中途有微任务加入）**，所以这个中途加进来的微任务也需要执行，控制台打印：*“在p.then的resolve()后执行，微任务1”*。这时，微任务队列清空了，第二次事件循环结束。
+
+   > 宏任务：setTimeout()宏任务2；	微任务：空；	执行栈：空；
+
+9. 第三次事件循环开始，取宏任务队列队首的任务“setTimeout() 宏任务2”，放入执行栈开始执行；控制台打印：*“定时器0秒后的回调，宏任务2”*，执行完后出栈。此时：
+
+   > 宏任务：空；	微任务：空；	执行栈：空；
+
+10. **亦可赛艇，历经三次事件循环，全部执行完了！**看似非常复杂，但这么理一理，还是可以很清楚的。由这个例子，触类旁通，再怎么变也不怕了。
+
+
+
+最后奉上这段代码的注释纯享版：
+
+```js
+console.log('宏任务0开始')  //本次宏任务开始
+let p = new Promise((resolve, reject)=>{
+    //Promise执行器里的同步函数，new Promise时立即执行（包含在本次宏任务内，不会跳出当前执行栈）
+    console.log('Promise执行器，包含在宏任务0内')
+    setTimeout(()=>{
+        //Promise执行器里的异步函数，是一个宏任务（Macrotask），跳出当前执行栈，0ms后进入任务队列（Task Queue）成为宏任务1，这个0ms的延迟就决定了相比宏任务2进入任务队列的先后，如果保持宏任务2的0ms延迟不变，将宏任务1的延迟改为1000ms，宏任务2将排在前面率先执行
+        console.log('Promise执行器里的异步函数，宏任务1')
+        resolve()
+        },0)
+    })
+p.then(() => {
+      //在p的resolve()后执行，是一个微任务（Microtask），跳出当前执行栈，进入作业队列（Job Queue）
+      console.log('在p的resolve()后执行，微任务0')
+  })
+  .then(() => {
+      //在p.then()的resolve()后执行，是一个微任务（Microtask），跳出当前执行栈，进入作业队列（Job Queue），排在上一个微任务后面
+      console.log('在p.then的resolve()后执行，微任务1')
+    })
+setTimeout(() => {
+    //定时器0秒后的回调，是一个宏任务，在0ms的延迟后进入任务队列，排在上一个宏任务1后面
+    console.log('定时器0秒后的回调，宏任务2')
+}, 0)
+console.log('宏任务0结束')
+```
+
+ ![](src\事件循环与任务优先级.png)
 
 ## 第12章 BOM
 
@@ -1256,4 +1849,5 @@ let makeKing = (name = 'Henry') => `King ${name}`;
    parent对象指向当前窗口的父窗口。
 
    self和window是同一个对象
-
+   
+   
